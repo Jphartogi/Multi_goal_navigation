@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+  
+  <!-- navigation -->
+  <node ns="multi_goal" pkg="multi_goal_driver" type="multi_goal_driver_node" name="multi_goal_driver" output="screen">
+    <!-- remap outputs -->
+    <!-- <remap from="/multi_goal/cmd_vel" to="/cmd_vel"/> -->
+    <rosparam command="load" file="$(find multi_goal_driver)/launch/goals.yaml"/>
+  </node>
+
+
+</launch>
