@@ -1,11 +1,11 @@
 goals:
-- frame_id: base_link
+- frame_id: map
   
   
-  poses: [[-0.1, 2.0, 1.0]] # in frame_id coords
+  poses: [[-3.0, 5.0, 1.0]] # in frame_id coords
   
-- frame_id: base_link
+- frame_id: map
   
  
-  poses: [[-0.4, 3.0, 2.0]] # in frame_id coords
+  poses: [[7.0, 3.0, 1.0]] # in frame_id coords
   

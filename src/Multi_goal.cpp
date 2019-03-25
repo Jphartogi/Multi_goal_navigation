@@ -2,9 +2,7 @@
 
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
-#include <move_base_msgs/MoveBaseActionResult.h>
-
-
+#include <move_base_msgs/MoveBaseActionFeedback.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
@@ -25,50 +23,161 @@ private:
   void callActionServer(move_base_msgs::MoveBaseGoal goal);
   void getGoals();
   void setGoals(Pose final_pose,double goal_num);
-  void resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg);
+  void run(int status);
+  int goal_count;
+  bool goal_reached ,goal_sended;
 
-  bool goal_reached;
-  double start_time, end_time;
+  
+  double real_start_time, real_end_time;
+
+  int i , j;
+
   ros::NodeHandle nh_;
-  // std::map<std::string, Pose> goal_map_;
   ros::Subscriber sub;
+  ros::Subscriber sub2;
+  move_base_msgs::MoveBaseGoal goal;
+  move_base_msgs::MoveBaseGoal goal2;
+  
+  int check_status(int status);
+  double get_start_time(double start_time);
+  double get_end_time(double end_time);
+  int goal_status;
+  // std::map<std::string, Pose> goal_map_;
+  
 
 public:
+  void resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg);
+  
   Multigoal(ros::NodeHandle nh);
   ~Multigoal();
 };
 
 Multigoal::Multigoal(ros::NodeHandle nh)
 {
+  i = 0;
+  j = 0;
   getGoals();
-  sub = nh.subscribe("/docker_control/move_base_linear/status",1,&Multigoal::resultCallback,this);
-  goal_reached = false;
-  start_time = 0;
-  
+  sub = nh.subscribe("/move_base/status",1,&Multigoal::resultCallback,this);
+  goal_count = 0;
+
 }
 
 Multigoal::~Multigoal()
 {
 }
 
+void Multigoal::run(int status)
+{
+  
+  if (status == 3 && goal_count == 0) { // this is the first stage 
+    
+    // still in the first stage but already in some position from previous action
+    goal_reached = false;
+    callActionServer(goal);
+    goal_count = goal_count + 1;
+    ROS_INFO("goal count mustinya 1 %i ",goal_count);
+  }
+  if(goal_count == 1 && status == 1)
+  {
+    // already succesfully sending the goal.
+    goal_count = goal_count + 1;
+     ROS_INFO("goal count mustinya 2 %i ",goal_count);
+  }
+  if (goal_count == 2 && status == 3) {
+    // already send the goal and the first goal is reached
+    callActionServer(goal2);
+    goal_count = goal_count + 1;
+     ROS_INFO("goal count mustinya 3 %i ",goal_count);
+  }
+  if (goal_count == 3 && status == 1) {
+    // already successfully sending the second goal.
+    goal_count = goal_count + 1;
+    ROS_INFO("goal count mustinya 4 %i ",goal_count);
+  }
+  if (goal_count == 4 && status == 3) {
+    ROS_INFO("all goal has reaced succesfully!");
+    goal_count = goal_count + 1;
+    ROS_INFO("goal count mustinya 5 %i ",goal_count);
+    
+  }
+  else
+  {
+    //do nothing
+  }
+  
+  
+}
+
+int Multigoal::check_status(int status)
+{
+  goal_status = status;
+  // ROS_INFO("goal_status %i",goal_status);
+  if (goal_status == 1) {
+    // ROS_INFO("goal_sended ");
+    goal_sended = true;
+    goal_reached = false;
+  }
+  if (goal_status == 3)
+  {
+    // ROS_INFO("goal reached");
+    goal_reached = true;
+    goal_sended = false;
+  }
+  run(goal_status);
+  return goal_status;
+  // check the current status
+
+}
+double Multigoal::get_start_time(double start_time)
+{
+  
+  if (start_time > 0 && i < 1 ) {
+    real_start_time = start_time;
+    std::cout << "real start time is :" << real_start_time << std::endl;
+    return real_start_time;
+    
+  }
+  
+}
+double Multigoal::get_end_time(double end_time){
+
+  if (end_time > 0 && j < 1 ) {
+    real_end_time = end_time;
+    std::cout << "real end time is :" << real_end_time << std::endl;
+    return real_end_time;
+    
+  }
+
+}
 
 void Multigoal::resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg){
 // check if goal is reached 
-std::cout << "statusnya itu berapa sih " << std::endl; 
-if (msg->status_list.empty())
+int goal_stat;
+goal_stat = msg->status_list[0].status;
+check_status(goal_stat);
+double start_time , finish_time;
+
+if (goal_count == 1)
 		{
 			// status is not clear, no goal is sended yet!
-			double time = msg->header.stamp.toSec(); // get the time from message
-		
+			start_time = msg->header.stamp.toSec(); // get the time from message
+      get_start_time(start_time);
+      i = i + 1;
+      
+      // getGoals();
+     
 		}
-		else{
-		int status = msg->status_list[0].status;
-    std::cout << "statusnya itu berapa sih " << status << std::endl; 
-
-			
-		}
-goal_reached = true;
+if ( goal_count == 5)
+    {
+      finish_time = msg->header.stamp.toSec(); // get the time from message
+      get_end_time(finish_time);
+      j = j + 1;
+      double total_time = real_start_time - real_end_time;
+      ROS_INFO("total time = %f",total_time);
+      goal_count = goal_count + 1;
+    }
 }
+
 
 void Multigoal::getGoals()
 {
@@ -97,7 +206,8 @@ std::string param_name;
     final_pose.frame = frame;
     setGoals(final_pose,i);
   }
-
+  // after the goal has been obtained, now run the code to go to the destination
+  
   }
   else
   {
@@ -106,13 +216,10 @@ std::string param_name;
 
 }
 
-
-
 void Multigoal::setGoals(Pose final_pose,double goal_num)
 {
   
   if (goal_num == 0) {
-  move_base_msgs::MoveBaseGoal goal;
   geometry_msgs::PoseStamped target_pose;
 
   //we'll send a goal to the robot to move 1 meter forward
@@ -122,25 +229,23 @@ void Multigoal::setGoals(Pose final_pose,double goal_num)
   goal.target_pose.pose.position.x = final_pose.x;
   goal.target_pose.pose.orientation.w = final_pose.theta;
   std::cout << "ini yang pertama bro " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
-  callActionServer(goal);
+  
+  
   }
-  else
+  if (goal_num == 1)
   {
-  move_base_msgs::MoveBaseGoal goal;
   geometry_msgs::PoseStamped target_pose;
 
   //we'll send a goal to the robot to move 1 meter forward
-  goal.target_pose.header.frame_id = final_pose.frame;
-  goal.target_pose.header.stamp = ros::Time::now();
+  goal2.target_pose.header.frame_id = final_pose.frame;
+  goal2.target_pose.header.stamp = ros::Time::now();
   
-  goal.target_pose.pose.position.x = final_pose.x;
-  goal.target_pose.pose.orientation.w = final_pose.theta;
-  std::cout << "ini yang kedua bro " <<final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
-  if (goal_reached) {
-    callActionServer(goal);
-  }
+  goal2.target_pose.pose.position.x = final_pose.x;
+  goal2.target_pose.pose.orientation.w = final_pose.theta;
   
-  
+  std::cout << "ini yang kedua bro " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
+    
+    
   }
   
 }
@@ -148,40 +253,29 @@ void Multigoal::setGoals(Pose final_pose,double goal_num)
 void Multigoal::callActionServer(move_base_msgs::MoveBaseGoal goal)
 {
   typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-   MoveBaseClient ac("/docker_control/move_base_linear/", true);
+   MoveBaseClient ac("/move_base", true);
 
-    while(!ac.waitForServer(ros::Duration(5.0))){
-    ROS_INFO("Waiting for the move_base action server to come up");
+  while(!ac.waitForServer(ros::Duration(5.0))){
+  ROS_INFO("Waiting for the move_base action server to come up");
     
   }
-  
- 
-    std::cout << "start time is " << start_time << std::endl;
   //we'll send a goal to the robot the goal we get from previous function
-  ROS_INFO("Sending goal");
   ac.sendGoal(goal);
+  ROS_INFO("Sending goal");
   
-  ac.waitForResult();
-
-  if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-    ROS_INFO("Hooray, the base moved 1 meter forward");
-    
-    
-  else
-    ROS_INFO("The base failed to move forward 1 meter for some reason");
-
-  // return 0;
+  
 }
-
 
 int main(int argc, char** argv){
     ros::init(argc,argv,"multi_goal_driver");
     ros::NodeHandle nh;
-    Multigoal Multigoal(nh);
-    
+    Multigoal Multigoal(nh);  
+    ros::Rate rate(5);
+    ros::spin();
+
+    return 0;
+
   //wait for the action server to come up
-
-
 
 }
 
