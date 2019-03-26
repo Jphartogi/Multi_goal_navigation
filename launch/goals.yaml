@@ -7,5 +7,5 @@ goals:
 - frame_id: map
   
  
-  poses: [[7.0, 3.0, 1.0]] # in frame_id coords
+  poses: [[4.0,2.0, 1.0]] # in frame_id coords
   

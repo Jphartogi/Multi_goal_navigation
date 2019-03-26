@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   std_msgs
   tf
+  roscpp
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,7 +108,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES multi_goal_driver
-  CATKIN_DEPENDS actionlib geometry_msgs nav_msgs std_msgs tf
+  CATKIN_DEPENDS actionlib geometry_msgs nav_msgs std_msgs tf roscpp
 #  DEPENDS system_lib
 )
 

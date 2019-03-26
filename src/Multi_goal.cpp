@@ -57,8 +57,10 @@ Multigoal::Multigoal(ros::NodeHandle nh)
   i = 0;
   j = 0;
   getGoals();
+  ROS_INFO("selesai get goals masih oke");
   sub = nh.subscribe("/move_base/status",1,&Multigoal::resultCallback,this);
   goal_count = 0;
+  goal_status = 0;
 
 }
 
@@ -75,29 +77,29 @@ void Multigoal::run(int status)
     goal_reached = false;
     callActionServer(goal);
     goal_count = goal_count + 1;
-    ROS_INFO("goal count mustinya 1 %i ",goal_count);
+    
   }
   if(goal_count == 1 && status == 1)
   {
     // already succesfully sending the goal.
     goal_count = goal_count + 1;
-     ROS_INFO("goal count mustinya 2 %i ",goal_count);
+    
   }
   if (goal_count == 2 && status == 3) {
     // already send the goal and the first goal is reached
     callActionServer(goal2);
     goal_count = goal_count + 1;
-     ROS_INFO("goal count mustinya 3 %i ",goal_count);
+    
   }
   if (goal_count == 3 && status == 1) {
     // already successfully sending the second goal.
     goal_count = goal_count + 1;
-    ROS_INFO("goal count mustinya 4 %i ",goal_count);
+    
   }
   if (goal_count == 4 && status == 3) {
     ROS_INFO("all goal has reaced succesfully!");
     goal_count = goal_count + 1;
-    ROS_INFO("goal count mustinya 5 %i ",goal_count);
+    
     
   }
   else
@@ -152,8 +154,16 @@ double Multigoal::get_end_time(double end_time){
 
 void Multigoal::resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg){
 // check if goal is reached 
+
 int goal_stat;
-goal_stat = msg->status_list[0].status;
+if (msg->status_list.empty()) {
+  goal_stat = 3;
+}
+else
+{
+  goal_stat = msg->status_list[0].status;
+}
+
 check_status(goal_stat);
 double start_time , finish_time;
 
@@ -172,7 +182,7 @@ if ( goal_count == 5)
       finish_time = msg->header.stamp.toSec(); // get the time from message
       get_end_time(finish_time);
       j = j + 1;
-      double total_time = real_start_time - real_end_time;
+      double total_time = abs(real_start_time - real_end_time);
       ROS_INFO("total time = %f",total_time);
       goal_count = goal_count + 1;
     }
@@ -228,7 +238,7 @@ void Multigoal::setGoals(Pose final_pose,double goal_num)
 
   goal.target_pose.pose.position.x = final_pose.x;
   goal.target_pose.pose.orientation.w = final_pose.theta;
-  std::cout << "ini yang pertama bro " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
+  std::cout << "first goal is :  " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
   
   
   }
@@ -243,7 +253,7 @@ void Multigoal::setGoals(Pose final_pose,double goal_num)
   goal2.target_pose.pose.position.x = final_pose.x;
   goal2.target_pose.pose.orientation.w = final_pose.theta;
   
-  std::cout << "ini yang kedua bro " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
+  std::cout << " second goal is: " << final_pose.x << ", " << final_pose.y << ", " << final_pose.theta << ", " << final_pose.frame << std::endl;
     
     
   }
