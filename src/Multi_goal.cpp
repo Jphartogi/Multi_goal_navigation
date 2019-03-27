@@ -9,6 +9,7 @@
 #include <string.h>
 #include <map>
 #include <nav_msgs/Odometry.h>
+#include <math.h>
 
 struct Pose
 {
@@ -24,30 +25,34 @@ private:
   void getGoals();
   void setGoals(Pose final_pose,double goal_num);
   void run(int status);
+  
   int goal_count;
-  bool goal_reached ,goal_sended;
+  bool goal_reached ,goal_sended, operation_started;
 
   
   double real_start_time, real_end_time;
+  double new_pose_x , new_pose_y , old_pose_x , old_pose_y, dist;
 
   int i , j;
 
   ros::NodeHandle nh_;
   ros::Subscriber sub;
   ros::Subscriber sub2;
+  ros::Subscriber odom_sub;
   move_base_msgs::MoveBaseGoal goal;
   move_base_msgs::MoveBaseGoal goal2;
   
   int check_status(int status);
   double get_start_time(double start_time);
   double get_end_time(double end_time);
+  double calculate_distance(double curr_pos, double last_pos);
   int goal_status;
   // std::map<std::string, Pose> goal_map_;
   
 
 public:
   void resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg);
-  
+  void odomCallback(const nav_msgs::Odometry::Ptr &msg);
   Multigoal(ros::NodeHandle nh);
   ~Multigoal();
 };
@@ -57,11 +62,13 @@ Multigoal::Multigoal(ros::NodeHandle nh)
   i = 0;
   j = 0;
   getGoals();
-  ROS_INFO("selesai get goals masih oke");
+  odom_sub = nh.subscribe("/husky_velocity_controller/odom",1,&Multigoal::odomCallback,this);
   sub = nh.subscribe("/move_base/status",1,&Multigoal::resultCallback,this);
   goal_count = 0;
   goal_status = 0;
-
+  operation_started = false;
+  old_pose_x = 0; old_pose_y = 0;
+  dist = 0;
 }
 
 Multigoal::~Multigoal()
@@ -99,8 +106,8 @@ void Multigoal::run(int status)
   if (goal_count == 4 && status == 3) {
     ROS_INFO("all goal has reaced succesfully!");
     goal_count = goal_count + 1;
-    
-    
+    operation_started = false;
+    ROS_INFO("total distance traveled : %f",dist);
   }
   else
   {
@@ -135,6 +142,7 @@ double Multigoal::get_start_time(double start_time)
   
   if (start_time > 0 && i < 1 ) {
     real_start_time = start_time;
+    operation_started = true;
     std::cout << "real start time is :" << real_start_time << std::endl;
     return real_start_time;
     
@@ -150,6 +158,34 @@ double Multigoal::get_end_time(double end_time){
     
   }
 
+}
+
+void Multigoal::odomCallback(const nav_msgs::Odometry::Ptr & msg)
+{
+
+  if (operation_started) {
+  new_pose_x = msg->pose.pose.position.x;
+  new_pose_y = msg->pose.pose.position.y;
+  double diff_x , diff_y;
+
+  diff_x = new_pose_x - old_pose_x;
+  diff_y = new_pose_y - old_pose_y;
+  dist = calculate_distance(diff_x,diff_y) + dist;
+  old_pose_x = new_pose_x; old_pose_y = new_pose_y;
+  
+  }
+  else
+  {
+    //
+  }
+  
+}
+
+double Multigoal::calculate_distance(double diff_x, double diff_y)
+{
+  // calculate the distance 
+  double result = hypot (diff_x, diff_y);
+  return result;
 }
 
 void Multigoal::resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg){
@@ -186,6 +222,7 @@ if ( goal_count == 5)
       ROS_INFO("total time = %f",total_time);
       goal_count = goal_count + 1;
     }
+    
 }
 
 
@@ -271,6 +308,7 @@ void Multigoal::callActionServer(move_base_msgs::MoveBaseGoal goal)
   }
   //we'll send a goal to the robot the goal we get from previous function
   ac.sendGoal(goal);
+  
   ROS_INFO("Sending goal");
   
   
