@@ -32,5 +32,5 @@ rosrun rviz rviz
 
 ```
 
-#author
+# Author
 Joshua Phartogi https://github.com/Jphartogi
