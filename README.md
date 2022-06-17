@@ -1,3 +1,8 @@
+# added function
+
+Based on this project, I improved the program and deleted the redundant parts of the program. Now I can add unlimited waypoints, and for drones, I added the function to land automatically after the program is executed.
+
+---
 # Multi_goal_navigation
 Multiple goals navigation which is set by YAML file and the goals are send to Move_base with actionclient
 
