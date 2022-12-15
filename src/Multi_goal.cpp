@@ -6,6 +6,12 @@
 #include <vector>
 #include <mavros_msgs/SetMode.h>
 
+enum status
+{
+  move_to_destination,
+  attack_aim
+};
+
 struct Pose
 {
   double x, y, theta, height;
@@ -17,11 +23,12 @@ class Multigoal
 private:
   XmlRpc::XmlRpcValue goals;
   std::vector<move_base_msgs::MoveBaseGoal> goal;
+  std::vector<int> current_task;
   ros::ServiceClient _set_mode_client;
 
   void callActionServer(move_base_msgs::MoveBaseGoal goal);
   void getGoals();
-  void setGoals(Pose final_pose);
+  void setGoals(Pose final_pose, int current_task);
 
   int goal_count;
   bool _verbose = true;
@@ -30,8 +37,11 @@ private:
   ros::NodeHandle nh_;
   ros::Subscriber sub;
 
+  int current_state = 0;
+
 public:
-  void resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg);
+  void
+  resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msg);
   Multigoal(ros::NodeHandle nh);
 };
 
@@ -58,7 +68,7 @@ void Multigoal::resultCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &
 
   // std::cout << "the current status:" << goal_stat << std::endl;
   static int cnt = 0;
-  //std::cout << "goal status=" << goal_stat << " goal_count " << goal_count << std::endl;
+  // std::cout << "goal status=" << goal_stat << " goal_count " << goal_count << std::endl;
   if (goal_stat == 3 && goal_count == 0)
   {
     std::cout << "the current cnt:" << cnt << " the size is:" << goal.size() << std::endl;
@@ -98,6 +108,7 @@ void Multigoal::getGoals()
       ROS_ERROR("No stations on parameterserver");
     }
 
+    // get Parameters from the yaml file
     nh_.getParam("/multi_goal/multi_goal_driver/goals", goals);
     for (size_t i = 0; i < goals.size(); i++)
     {
@@ -106,11 +117,12 @@ void Multigoal::getGoals()
       XmlRpc::XmlRpcValue poses = goal["poses"];
       std::string frame = goal["frame_id"];
       XmlRpc::XmlRpcValue pose_back = poses[poses.size() - 1];
+      XmlRpc::XmlRpcValue current_tsk = goal["task"];
       final_pose.x = pose_back[0];
       final_pose.y = pose_back[1];
       final_pose.theta = pose_back[2];
       final_pose.frame = frame;
-      setGoals(final_pose);
+      setGoals(final_pose, current_tsk);
     }
     // after the goal has been obtained, now run the code to go to the destination
   }
@@ -120,7 +132,7 @@ void Multigoal::getGoals()
   }
 }
 
-void Multigoal::setGoals(Pose final_pose)
+void Multigoal::setGoals(Pose final_pose, int current_task)
 {
   static int cnt = 1;
   geometry_msgs::PoseStamped target_pose;
@@ -137,6 +149,7 @@ void Multigoal::setGoals(Pose final_pose)
   cnt++;
 
   goal.push_back(target_goal);
+  current_task.push_back(current_task);
 }
 
 void Multigoal::callActionServer(move_base_msgs::MoveBaseGoal goal)
